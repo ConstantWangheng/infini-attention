@@ -73,8 +73,12 @@ class InfiniAttention(nn.Module):
 
             sigma_q = self.elu(query[:, :, idx, :, :]) + 1.0
             sigma_k = self.elu(key[:, :, idx, :, :]) + 1.0
+            
+            # z 可以在一定程度上，理解为归一化项
+            # A_mem 理解为，Q从过去的kv矩阵中去检索
             A_mem = (sigma_q @ memory) / ((sigma_q @ z) + 1e-6)  # Adding 1e-6 for preventing division to 0
 
+            # A_dot 理解为，Q和当前的k、v去计算相似度
             A_dot = query[:, :, idx, :, :] @ key[:, :, idx, :, :].transpose(-2, -1)
             
             if self.is_causal:
@@ -83,6 +87,7 @@ class InfiniAttention(nn.Module):
             A_dot = F.softmax(A_dot / torch.sqrt(torch.tensor(self.d_head)), dim = -1)
             A_dot =  A_dot @ value[:, :, idx, :, :]
 
+            # 通过gate机制去融合长期记忆A_mem和近期记忆A_dot
             attention = (F.sigmoid(self.beta) * A_mem) + ((1 - F.sigmoid(self.beta)) * A_dot)
 
             #Update
